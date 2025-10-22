@@ -1,6 +1,6 @@
 class ApiConstants {
   // Base URL - THAY ĐỔI THEO SERVER CỦA BẠN
-  static const String baseUrl = 'https://foundtealski4.conveyor.cloud/api';
+  static const String baseUrl = 'https://nextbrushedbook63.conveyor.cloud/api';
 
   // Auth
   static const String login = '/Auth/login';

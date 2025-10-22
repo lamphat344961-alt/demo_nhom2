@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+
+// Import các tab thật của bạn
 import 'dashboard_tab.dart';
 import 'manage_orders_tab.dart';
 import 'manage_vehicles_tab.dart';
@@ -18,26 +20,37 @@ class OwnerHomeScreen extends StatefulWidget {
 class _OwnerHomeScreenState extends State<OwnerHomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = [
-    const DashboardTab(),
-    const ManageOrdersTab(),
-    const ManageVehiclesTab(),
-    const ManageDriversTab(),
-    const ManagePointsTab(),
-    const ManageProductsTab(),
-    const AccountTab(),
+  // Danh sách "builder" để lazy-load tab
+  late final List<Widget Function()> _builders = [
+    () => const DashboardTab(),
+    () => const ManageOrdersTab(),
+    () => const ManageVehiclesTab(),
+    () => const ManageDriversTab(),
+    () => const ManagePointsTab(), // tab này thường có map → cần lazy
+    () => const ManageProductsTab(),
+    () => const AccountTab(),
   ];
+
+  // Bộ đệm tab đã tạo (chỉ tạo khi cần)
+  late final List<Widget?> _cached = List<Widget?>.filled(
+    _builders.length,
+    null,
+  );
+
+  Widget _currentBody() {
+    // Nếu tab chưa được tạo -> tạo và cache
+    _cached[_currentIndex] ??= _builders[_currentIndex].call();
+    return _cached[_currentIndex]!;
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(index: _currentIndex, children: _screens),
+      body: _currentBody(), // ❗ Chỉ build tab đang xem
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          setState(() => _currentIndex = index);
         },
         backgroundColor: Colors.white,
         indicatorColor: AppColors.ownerPrimary.withOpacity(0.2),

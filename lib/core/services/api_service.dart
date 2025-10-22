@@ -40,9 +40,7 @@ class ApiService {
           return handler.next(options);
         },
         onResponse: (response, handler) {
-          _logger.d(
-            'RESPONSE[${response.statusCode}] => DATA: ${response.data}',
-          );
+          // debugPrint('RESP[${response.statusCode}] ${response.requestOptions.path}');
           return handler.next(response);
         },
         onError: (error, handler) async {
