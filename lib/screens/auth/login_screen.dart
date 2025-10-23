@@ -1,10 +1,10 @@
-import 'package:demo_nhom2/core/constants/api_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../owner/owner_home_screen.dart';
 import '../driver/driver_home_screen.dart';
+import '../../widgets/custom_button.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -27,11 +27,11 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+    // SỬA LỖI ASYNC GAP: Lưu context-dependent objects TRƯỚC await
+    final navigator = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
 
-    print('=== DEBUG LOGIN ===');
-    print('Username: ${_usernameController.text}');
-    print('API URL: ${ApiConstants.baseUrl}${ApiConstants.login}');
+    if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
@@ -41,27 +41,19 @@ class _LoginScreenState extends State<LoginScreen> {
         _passwordController.text,
       );
 
-      print('Login success: $success');
-      print('Role: ${authProvider.role}');
-
-      if (!mounted) return;
-
       if (success) {
-        print('Login success. Starting navigation...');
         if (authProvider.isOwner) {
-          print('Navigating to OwnerHomeScreen'); // <-- THÊM DÒNG NÀY
-          Navigator.of(context).pushReplacement(
+          navigator.pushReplacement(
             MaterialPageRoute(builder: (_) => const OwnerHomeScreen()),
           );
         } else if (authProvider.isDriver) {
-          print('Navigating to DriverHomeScreen');
-          Navigator.of(context).pushReplacement(
+          navigator.pushReplacement(
             MaterialPageRoute(builder: (_) => const DriverHomeScreen()),
           );
         }
-        print('Navigation command sent.');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        // SỬA LỖI ASYNC GAP: Dùng 'messenger' đã lưu
+        messenger.showSnackBar(
           SnackBar(
             content: Text(authProvider.errorMessage ?? 'Đăng nhập thất bại'),
             backgroundColor: AppColors.error,
@@ -69,9 +61,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       }
     } catch (e) {
-      print('=== ERROR ===');
-      print(e);
-      ScaffoldMessenger.of(context).showSnackBar(
+      // SỬA LỖI ASYNC GAP: Dùng 'messenger' đã lưu
+      messenger.showSnackBar(
         SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
       );
     }
@@ -90,15 +81,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
-                  Icon(
+                  // ... (Phần Logo và Title giữ nguyên) ...
+                  const Icon(
                     Icons.local_shipping,
                     size: 80,
                     color: AppColors.primary,
                   ),
                   const SizedBox(height: 16),
-
-                  // Title
                   Text(
                     'Đăng nhập',
                     textAlign: TextAlign.center,
@@ -117,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 48),
 
-                  // Username field
+                  // ... (Phần TextFormField giữ nguyên) ...
                   TextFormField(
                     controller: _usernameController,
                     decoration: InputDecoration(
@@ -137,8 +126,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   const SizedBox(height: 16),
-
-                  // Password field
                   TextFormField(
                     controller: _passwordController,
                     obscureText: _obscurePassword,
@@ -172,38 +159,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
 
-                  // Login button
+                  // 2. THAY THẾ NÚT ĐĂNG NHẬP
+                  // Chúng ta vẫn giữ Consumer để lấy trạng thái isLoading
                   Consumer<AuthProvider>(
                     builder: (context, auth, _) {
-                      return SizedBox(
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: auth.isLoading ? null : _handleLogin,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            elevation: 2,
-                          ),
-                          child: auth.isLoading
-                              ? const SizedBox(
-                                  height: 24,
-                                  width: 24,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: Colors.white,
-                                  ),
-                                )
-                              : const Text(
-                                  'Đăng nhập',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                        ),
+                      // Thay thế SizedBox(child: ElevatedButton(...))
+                      // bằng CustomButton
+                      return CustomButton(
+                        text: 'Đăng nhập',
+                        onPressed: _handleLogin,
+                        // Truyền trạng thái loading vào widget mới
+                        isLoading: auth.isLoading,
                       );
                     },
                   ),

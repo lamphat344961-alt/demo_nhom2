@@ -3,6 +3,8 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
+import '../../widgets/loading_widget.dart';
+import '../../widgets/error_widget.dart';
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -14,6 +16,7 @@ class DashboardTab extends StatefulWidget {
 class _DashboardTabState extends State<DashboardTab> {
   final ApiService _api = ApiService();
   bool _isLoading = true;
+  String? _errorMessage;
 
   int _totalOrders = 0;
   int _totalVehicles = 0;
@@ -27,10 +30,12 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Future<void> _loadDashboardData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
-      // Load all data in parallel
       final results = await Future.wait([
         _api.get(ApiConstants.orders),
         _api.get(ApiConstants.vehicles),
@@ -39,7 +44,6 @@ class _DashboardTabState extends State<DashboardTab> {
       ]);
 
       setState(() {
-        // Áp dụng safe-check: Nếu data không phải List, coi như nó là danh sách rỗng (length = 0)
         _totalOrders =
             (results[0].data is List ? results[0].data as List : []).length;
         _totalVehicles =
@@ -51,20 +55,58 @@ class _DashboardTabState extends State<DashboardTab> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
-      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
     }
+  }
+
+
+  Widget _buildContent() {
+
+    if (_isLoading) {
+      return const LoadingWidget();
+    }
+
+    if (_errorMessage != null) {
+      return ErrorDisplayWidget(
+        message: _errorMessage!,
+        onRetry: _loadDashboardData,
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadDashboardData,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildStatsGrid(),
+            const SizedBox(height: 24),
+            Text(
+              'Biểu đồ tổng quan',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+            _buildChart(),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
+        title: const Text('Thống kê tổng quan'),
         backgroundColor: AppColors.ownerPrimary,
         foregroundColor: Colors.white,
         actions: [
@@ -74,33 +116,7 @@ class _DashboardTabState extends State<DashboardTab> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadDashboardData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Stats Cards
-                    _buildStatsGrid(),
-                    const SizedBox(height: 24),
-
-                    // Chart
-                    Text(
-                      'Thống kê tổng quan',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildChart(),
-                  ],
-                ),
-              ),
-            ),
+      body: _buildContent(),
     );
   }
 
@@ -111,7 +127,7 @@ class _DashboardTabState extends State<DashboardTab> {
       mainAxisSpacing: 16,
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.5,
+      childAspectRatio: 1.4,
       children: [
         _buildStatCard(
           'Đơn hàng',
@@ -142,11 +158,11 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildStatCard(
-    String title,
-    String value,
-    IconData icon,
-    Color color,
-  ) {
+      String title,
+      String value,
+      IconData icon,
+      Color color,
+      ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -154,7 +170,7 @@ class _DashboardTabState extends State<DashboardTab> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -162,6 +178,7 @@ class _DashboardTabState extends State<DashboardTab> {
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(icon, size: 32, color: color),
           const SizedBox(height: 8),
@@ -180,6 +197,7 @@ class _DashboardTabState extends State<DashboardTab> {
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),
@@ -188,11 +206,7 @@ class _DashboardTabState extends State<DashboardTab> {
 
   Widget _buildChart() {
     final totals = [_totalOrders, _totalVehicles, _totalProducts, _totalPoints];
-
-    // Tìm giá trị lớn nhất trong danh sách. Sử dụng fold để an toàn hơn reduce()
     final maxCount = totals.fold(0, (a, b) => a > b ? a : b);
-
-    // Đảm bảo maxY luôn >= 5.0 để tránh lỗi crash của fl_chart khi maxY = 0.0
     final double safeMaxY = (maxCount > 0 ? maxCount * 1.2 : 5).toDouble();
 
     return Container(
@@ -203,7 +217,7 @@ class _DashboardTabState extends State<DashboardTab> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withAlpha(13),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -212,7 +226,6 @@ class _DashboardTabState extends State<DashboardTab> {
       child: BarChart(
         BarChartData(
           alignment: BarChartAlignment.spaceAround,
-          // SỬ DỤNG safeMaxY ĐỂ TRÁNH CRASH
           maxY: safeMaxY,
           barTouchData: BarTouchData(enabled: false),
           titlesData: FlTitlesData(
@@ -222,9 +235,12 @@ class _DashboardTabState extends State<DashboardTab> {
                 showTitles: true,
                 getTitlesWidget: (value, meta) {
                   const titles = ['Đơn', 'Xe', 'Hàng', 'Điểm'];
-                  return Text(
-                    titles[value.toInt()],
-                    style: const TextStyle(fontSize: 12),
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      titles[value.toInt()],
+                      style: const TextStyle(fontSize: 12),
+                    ),
                   );
                 },
               ),

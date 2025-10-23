@@ -4,7 +4,8 @@ import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
-import '../../models/order_model.dart';
+import '../../widgets/loading_widget.dart';
+import '../../widgets/error_widget.dart';
 
 class ManageOrdersTab extends StatefulWidget {
   const ManageOrdersTab({super.key});
@@ -18,6 +19,9 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
   List<OrderModel> _orders = [];
   bool _isLoading = true;
 
+
+  String? _errorMessage;
+
   @override
   void initState() {
     super.initState();
@@ -25,7 +29,11 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
   }
 
   Future<void> _loadOrders() async {
-    setState(() => _isLoading = true);
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     try {
       final response = await _api.get(ApiConstants.orders);
@@ -36,16 +44,16 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
-      }
+
+      setState(() {
+        _isLoading = false;
+        _errorMessage = e.toString();
+      });
     }
   }
 
   Future<void> _showAddDialog() async {
+
     final madonController = TextEditingController();
     final tongtienController = TextEditingController(text: '0');
 
@@ -91,6 +99,9 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
                 return;
               }
 
+              final navigator = Navigator.of(context);
+              final messenger = ScaffoldMessenger.of(context);
+
               try {
                 await _api.post(
                   ApiConstants.orders,
@@ -101,20 +112,15 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
                   },
                 );
 
-                Navigator.pop(context);
+                navigator.pop();
                 _loadOrders();
-
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Thêm đơn hàng thành công')),
-                  );
-                }
+                messenger.showSnackBar(
+                  const SnackBar(content: Text('Thêm đơn hàng thành công')),
+                );
               } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Lỗi: ${e.toString()}')),
-                  );
-                }
+                messenger.showSnackBar(
+                  SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                );
               }
             },
             child: const Text('Thêm'),
@@ -125,8 +131,12 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
   }
 
   Future<void> _deleteOrder(String madon) async {
+
+    final messenger = ScaffoldMessenger.of(context);
+    final currentContext = context;
+
     final confirm = await showDialog<bool>(
-      context: context,
+      context: currentContext,
       builder: (context) => AlertDialog(
         title: const Text('Xác nhận xóa'),
         content: Text('Bạn có chắc muốn xóa đơn hàng $madon?'),
@@ -150,18 +160,42 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
       await _api.delete(ApiConstants.orderById(madon));
       _loadOrders();
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Xóa đơn hàng thành công')),
-        );
-      }
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Xóa đơn hàng thành công')),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
-      }
+      messenger.showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
     }
+  }
+
+  Widget _buildContent() {
+
+    if (_isLoading) {
+      return const LoadingWidget();
+    }
+
+    if (_errorMessage != null) {
+      return ErrorDisplayWidget(
+        message: _errorMessage!,
+        onRetry: _loadOrders,
+      );
+    }
+
+    if (_orders.isEmpty) {
+      return const Center(child: Text('Chưa có đơn hàng nào'));
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadOrders,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _orders.length,
+        itemBuilder: (context, index) {
+          final order = _orders[index];
+          return _buildOrderCard(order);
+        },
+      ),
+    );
   }
 
   @override
@@ -175,21 +209,7 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadOrders),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadOrders,
-              child: _orders.isEmpty
-                  ? const Center(child: Text('Chưa có đơn hàng nào'))
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _orders.length,
-                      itemBuilder: (context, index) {
-                        final order = _orders[index];
-                        return _buildOrderCard(order);
-                      },
-                    ),
-            ),
+      body: _buildContent(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,
         backgroundColor: AppColors.ownerPrimary,
@@ -208,7 +228,7 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withAlpha(26),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(Icons.inventory_2, color: AppColors.primary),

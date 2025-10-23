@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:dio/io.dart';
 import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import '../constants/api_constants.dart';
@@ -27,6 +29,16 @@ class ApiService {
         },
       ),
     );
+
+    // THÊM ĐOẠN CODE NÀY ĐỂ BỎ QUA LỖI CHỨNG CHỈ SSL (HTTPS)
+    // Chỉ dùng cho môi trường development
+    (_dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+      final client = HttpClient();
+      // Bỏ qua tất cả các chứng chỉ không hợp lệ
+      client.badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+      return client;
+    };
 
     _dio.interceptors.add(
       InterceptorsWrapper(
@@ -60,9 +72,9 @@ class ApiService {
   }
 
   Future<Response> get(
-    String path, {
-    Map<String, dynamic>? queryParameters,
-  }) async {
+      String path, {
+        Map<String, dynamic>? queryParameters,
+      }) async {
     try {
       return await _dio.get(path, queryParameters: queryParameters);
     } on DioException catch (e) {
@@ -112,9 +124,9 @@ class ApiService {
           if (data is Map) {
             errorMessage =
                 data['message'] ??
-                data['error'] ??
-                data['title'] ??
-                'Lỗi từ server (${statusCode})';
+                    data['error'] ??
+                    data['title'] ??
+                    'Lỗi từ server (${statusCode})';
           } else if (data is String) {
             errorMessage = data;
           }
@@ -127,17 +139,18 @@ class ApiService {
         errorMessage = 'Yêu cầu đã bị hủy';
         break;
 
+    // Lỗi SSL thường rơi vào 1 trong 2 trường hợp này
       case DioExceptionType.connectionError:
-        errorMessage = 'Không thể kết nối đến server. Kiểm tra URL và mạng.';
+        errorMessage = 'Không thể kết nối đến server. Kiểm tra IP/mạng/SSL.';
         break;
-
       case DioExceptionType.unknown:
-        if (error.message?.contains('SocketException') ?? false) {
-          errorMessage = 'Không thể kết nối đến server';
+        if (error.error is SocketException) {
+          errorMessage = 'Lỗi Socket: Không thể kết nối. Kiểm tra IP/mạng/SSL.';
         } else {
           errorMessage = 'Lỗi không xác định: ${error.message}';
         }
         break;
+    // ======================================================
 
       default:
         errorMessage = error.message ?? 'Lỗi không xác định';
