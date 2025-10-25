@@ -109,36 +109,6 @@ class DriverAccountTab extends StatelessWidget {
           ),
 
           const SizedBox(height: 24),
-
-          // Quick Stats
-          Card(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Thống kê hôm nay',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildStatItem(Icons.check_circle, '0', 'Hoàn thành'),
-                      _buildStatItem(Icons.pending, '0', 'Đang giao'),
-                      _buildStatItem(Icons.schedule, '0', 'Chờ giao'),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
           const SizedBox(height: 24),
 
           // Settings Options

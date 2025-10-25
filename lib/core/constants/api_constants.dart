@@ -1,6 +1,8 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 class ApiConstants {
-  // Base URL - THAY ĐỔI THEO SERVER CỦA BẠN
-  static const String baseUrl = 'https://nextbrushedbook63.conveyor.cloud/api';
+  static final String baseUrl =
+      dotenv.env['BASE_URL'] ?? 'https://localhost:7197/api';
 
   // Auth
   static const String login = '/Auth/login';
@@ -41,6 +43,8 @@ class ApiConstants {
   // Driver
   static const String myDeliveries = '/Driver/my-deliveries';
   static const String completeDelivery = '/CtDiemGiao/complete';
+  // Thêm vào class ApiConstants:
+  static String driverComplete(String maDon) => '/api/Driver/complete/$maDon';
 
   // Timeout
   static const Duration timeout = Duration(seconds: 30);
