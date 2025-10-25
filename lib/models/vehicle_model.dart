@@ -14,12 +14,13 @@ class VehicleModel {
   });
 
   factory VehicleModel.fromJson(Map<String, dynamic> json) {
+
     return VehicleModel(
-      bsXe: json['bs_XE'] ?? json['BS_XE'] ?? '',
-      tenxe: json['tenxe'] ?? json['TENXE'],
-      ttXe: json['tt_XE'] ?? json['TT_XE'],
-      userId: json['userId'] ?? json['UserId'],
-      driverFullName: json['driverFullName'] ?? json['DriverFullName'],
+      bsXe: json['bS_XE'] ?? '',
+      tenxe: json['tenxe'],
+      ttXe: json['tT_XE'],
+      userId: json['userId'],
+      driverFullName: json['driverFullName'],
     );
   }
 }
