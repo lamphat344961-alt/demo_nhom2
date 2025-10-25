@@ -1,4 +1,10 @@
+// [GIẢ ĐỊNH] Bạn cần import 2 file này
 import 'package:demo_nhom2/models/order_model.dart';
+// (File 'order_model.dart' chứa cả OrderModel, DeliveryPointModel, và VehicleModel)
+
+// [THÊM MỚI] Import màn hình chi tiết
+import 'package:demo_nhom2/screens/owner/order_details_screen.dart';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
@@ -18,33 +24,48 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
   final ApiService _api = ApiService();
   List<OrderModel> _orders = [];
   bool _isLoading = true;
-
-
   String? _errorMessage;
+
+  // Dữ liệu cho các Dropdown trong Dialog
+  List<DeliveryPointModel> _deliveryPoints = [];
+  List<VehicleModel> _vehicles = [];
 
   @override
   void initState() {
     super.initState();
-    _loadOrders();
+    // Tải đồng thời cả đơn hàng, điểm giao, và xe
+    _loadAllData();
   }
 
-  Future<void> _loadOrders() async {
-
+  Future<void> _loadAllData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final response = await _api.get(ApiConstants.orders);
-      final List data = response.data;
+      // Chạy song song 3 API calls
+      final responses = await Future.wait([
+        _api.get(ApiConstants.orders),
+        _api.get(ApiConstants.deliveryPoints), // /api/DiemGiao
+        _api.get(ApiConstants.vehicles), // /api/Xe
+      ]);
+
+      final List ordersData = responses[0].data;
+      final List pointsData = responses[1].data;
+      final List vehiclesData = responses[2].data;
 
       setState(() {
-        _orders = data.map((json) => OrderModel.fromJson(json)).toList();
+        _orders = ordersData.map((json) => OrderModel.fromJson(json)).toList();
+        _deliveryPoints = pointsData
+            .map((json) => DeliveryPointModel.fromJson(json))
+            .toList();
+        _vehicles = vehiclesData
+            .map((json) => VehicleModel.fromJson(json))
+            .toList();
         _isLoading = false;
       });
     } catch (e) {
-
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -52,86 +73,191 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
     }
   }
 
-  Future<void> _showAddDialog() async {
+  // Tách hàm load orders để dùng cho RefreshIndicator
+  Future<void> _loadOrders() async {
+    // Không cần set _isLoading = true ở đây để refresh mượt hơn
+    // (RefreshIndicator có loading riêng)
+    try {
+      final response = await _api.get(ApiConstants.orders);
+      final List data = response.data;
 
+      setState(() {
+        _orders = data.map((json) => OrderModel.fromJson(json)).toList();
+        _errorMessage = null; // Xóa lỗi cũ nếu refresh thành công
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+      });
+    }
+  }
+
+  Future<void> _showAddDialog() async {
+    // Controllers cho các trường
     final madonController = TextEditingController();
     final tongtienController = TextEditingController(text: '0');
+    final maloaiController = TextEditingController();
+
+    // State cho Dropdowns
+    DeliveryPointModel? selectedPoint;
+    VehicleModel? selectedVehicle;
+    final formKey = GlobalKey<FormState>();
+
+    // (Giả định _deliveryPoints và _vehicles đã được tải trong _loadAllData)
 
     return showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thêm đơn hàng'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: madonController,
-                decoration: const InputDecoration(
-                  labelText: 'Mã đơn *',
-                  border: OutlineInputBorder(),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: const Text('Thêm đơn hàng'),
+            content: Form(
+              key: formKey,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextFormField(
+                      controller: madonController,
+                      decoration: const InputDecoration(
+                        labelText: 'Mã đơn *',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Vui lòng nhập mã đơn'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // DROPDOWN CHỌN ĐIỂM GIAO (Bắt buộc)
+                    DropdownButtonFormField<DeliveryPointModel>(
+                      value: selectedPoint,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Điểm giao hàng *',
+                        border: OutlineInputBorder(),
+                      ),
+                      hint: const Text('Chọn điểm giao'),
+                      items: _deliveryPoints.map((point) {
+                        return DropdownMenuItem<DeliveryPointModel>(
+                          value: point,
+                          child: Text(
+                            '${point.ten} (${point.vitri})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedPoint = value;
+                        });
+                      },
+                      validator: (value) =>
+                          (value == null) ? 'Vui lòng chọn điểm giao' : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    // DROPDOWN CHỌN XE (Không bắt buộc)
+                    DropdownButtonFormField<VehicleModel>(
+                      value: selectedVehicle,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Gán cho xe', // Không bắt buộc
+                        border: OutlineInputBorder(),
+                      ),
+                      hint: const Text('Chọn xe (nếu có)'),
+                      items: _vehicles.map((vehicle) {
+                        return DropdownMenuItem<VehicleModel>(
+                          value: vehicle,
+                          child: Text(
+                            '${vehicle.bsXe} (${vehicle.tenxe ?? "N/A"})',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          selectedVehicle = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: maloaiController,
+                      decoration: const InputDecoration(
+                        labelText: 'Mã loại hàng *',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) => (value == null || value.isEmpty)
+                          ? 'Vui lòng nhập mã loại'
+                          : null,
+                    ),
+                    const SizedBox(height: 16),
+
+                    TextFormField(
+                      controller: tongtienController,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Tổng tiền',
+                        border: OutlineInputBorder(),
+                        prefixText: '₫ ',
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: tongtienController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Tổng tiền',
-                  border: OutlineInputBorder(),
-                  prefixText: '₫ ',
-                ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (formKey.currentState?.validate() != true) {
+                    return;
+                  }
+
+                  final navigator = Navigator.of(context);
+                  final messenger = ScaffoldMessenger.of(context);
+
+                  // Dữ liệu gửi đi (đã sửa lỗi 'toIso817String')
+                  final Map<String, dynamic> body = {
+                    'madon': madonController.text,
+                    'ngaylap': DateTime.now().toIso8601String(), // <-- Sửa lỗi
+                    'tongtien': double.tryParse(tongtienController.text) ?? 0,
+                    'd_DD': selectedPoint!.idDD,
+                    'maloai': maloaiController.text,
+                    'trangthai': 'Mới',
+                    'bS_XE':
+                        selectedVehicle?.bsXe, // Gửi biển số xe (có thể null)
+                  };
+
+                  try {
+                    await _api.post(ApiConstants.orders, data: body);
+
+                    navigator.pop();
+                    _loadOrders(); // Tải lại danh sách
+                    messenger.showSnackBar(
+                      const SnackBar(content: Text('Thêm đơn hàng thành công')),
+                    );
+                  } catch (e) {
+                    messenger.showSnackBar(
+                      SnackBar(content: Text('Lỗi: ${e.toString()}')),
+                    );
+                  }
+                },
+                child: const Text('Thêm'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (madonController.text.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Vui lòng nhập mã đơn')),
-                );
-                return;
-              }
-
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
-
-              try {
-                await _api.post(
-                  ApiConstants.orders,
-                  data: {
-                    'madon': madonController.text,
-                    'ngaylap': DateTime.now().toIso8601String(),
-                    'tongtien': double.tryParse(tongtienController.text) ?? 0,
-                  },
-                );
-
-                navigator.pop();
-                _loadOrders();
-                messenger.showSnackBar(
-                  const SnackBar(content: Text('Thêm đơn hàng thành công')),
-                );
-              } catch (e) {
-                messenger.showSnackBar(
-                  SnackBar(content: Text('Lỗi: ${e.toString()}')),
-                );
-              }
-            },
-            child: const Text('Thêm'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
   Future<void> _deleteOrder(String madon) async {
-
     final messenger = ScaffoldMessenger.of(context);
     final currentContext = context;
 
@@ -169,7 +295,6 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
   }
 
   Widget _buildContent() {
-
     if (_isLoading) {
       return const LoadingWidget();
     }
@@ -177,7 +302,7 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
     if (_errorMessage != null) {
       return ErrorDisplayWidget(
         message: _errorMessage!,
-        onRetry: _loadOrders,
+        onRetry: _loadAllData, // Dùng _loadAllData khi retry
       );
     }
 
@@ -186,7 +311,7 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadOrders,
+      onRefresh: _loadOrders, // Chỉ tải lại orders
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: _orders.length,
@@ -225,6 +350,22 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
+
+        // ----- THÊM SỰ KIỆN ONTAP -----
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => OrderDetailsScreen(order: order),
+            ),
+          ).then((_) {
+            // Tải lại danh sách đơn hàng khi quay lại
+            // để cập nhật tổng tiền (nếu chi tiết đơn hàng thay đổi)
+            _loadOrders();
+          });
+        },
+
+        // -------------------------
         leading: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
@@ -249,7 +390,8 @@ class _ManageOrdersTabState extends State<ManageOrdersTab> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            if (order.bsXe != null) Text('Xe: ${order.bsXe}'),
+            if (order.bsXe != null && order.bsXe!.isNotEmpty)
+              Text('Xe: ${order.bsXe}'),
           ],
         ),
         trailing: PopupMenuButton(
