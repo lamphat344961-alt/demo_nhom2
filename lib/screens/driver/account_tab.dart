@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart'; // <--- THÊM IMPORT
+
 import '../../core/constants/app_colors.dart';
 import '../../core/services/storage_service.dart';
 import '../../providers/auth_provider.dart';
@@ -8,7 +10,47 @@ import '../auth/login_screen.dart';
 class DriverAccountTab extends StatelessWidget {
   const DriverAccountTab({super.key});
 
+  // ----- THÊM HẰNG SỐ SỐ ĐIỆN THOẠI -----
+  static const String _ownerPhoneNumber = '0979344962'; // <-- SỐ CỦA BẠN
+
+  // ----- HÀM MỚI: GỌI ĐIỆN -----
+  Future<void> _callOwner(BuildContext context) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: _ownerPhoneNumber);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        throw 'Không thể mở ứng dụng gọi điện';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
+      }
+    }
+  }
+
+  // ----- HÀM MỚI: NHẮN TIN -----
+  Future<void> _textOwner(BuildContext context) async {
+    final Uri launchUri = Uri(scheme: 'sms', path: _ownerPhoneNumber);
+    try {
+      if (await canLaunchUrl(launchUri)) {
+        await launchUrl(launchUri);
+      } else {
+        throw 'Không thể mở ứng dụng nhắn tin';
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
+      }
+    }
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
+    // (Hàm logout giữ nguyên)
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -55,7 +97,7 @@ class DriverAccountTab extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Profile Card
+          // Profile Card (Giữ nguyên)
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -69,7 +111,7 @@ class DriverAccountTab extends StatelessWidget {
                     radius: 50,
                     backgroundColor: AppColors.driverPrimary.withOpacity(0.2),
                     child: Text(
-                      fullName[0].toUpperCase(),
+                      fullName.isNotEmpty ? fullName[0].toUpperCase() : 'D',
                       style: const TextStyle(
                         fontSize: 40,
                         fontWeight: FontWeight.bold,
@@ -109,9 +151,42 @@ class DriverAccountTab extends StatelessWidget {
           ),
 
           const SizedBox(height: 24),
+
+          // ----- THÊM PHẦN LIÊN HỆ KHẨN CẤP -----
+          Card(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(
+                    Icons.call_outlined, // Icon gọi điện
+                    color: AppColors.success, // Màu xanh lá
+                  ),
+                  title: const Text('Gọi khẩn cấp Chủ xe'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => _callOwner(context), // <-- Gọi hàm
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(
+                    Icons.sms_outlined, // Icon nhắn tin
+                    color: AppColors.warning, // Màu vàng
+                  ),
+                  title: const Text('Nhắn tin Chủ xe'),
+                  trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                  onTap: () => _textOwner(context), // <-- Gọi hàm
+                ),
+              ],
+            ),
+          ),
+
+          // ------------------------------------
           const SizedBox(height: 24),
 
-          // Settings Options
+          // Settings Options (Giữ nguyên)
           Card(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -160,7 +235,7 @@ class DriverAccountTab extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // Logout Button
+          // Logout Button (Giữ nguyên)
           SizedBox(
             height: 56,
             child: ElevatedButton.icon(
@@ -182,7 +257,7 @@ class DriverAccountTab extends StatelessWidget {
 
           const SizedBox(height: 32),
 
-          // App Info
+          // App Info (Giữ nguyên)
           Center(
             child: Column(
               children: [
@@ -209,6 +284,7 @@ class DriverAccountTab extends StatelessWidget {
     );
   }
 
+  // (Widget _buildStatItem giữ nguyên, hiện không được dùng)
   Widget _buildStatItem(IconData icon, String value, String label) {
     return Column(
       children: [

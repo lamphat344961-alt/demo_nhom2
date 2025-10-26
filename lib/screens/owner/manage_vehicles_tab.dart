@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:dio/dio.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
-import '../../models/order_model.dart';
 import '../../models/user_model.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/error_widget.dart';
@@ -16,10 +16,12 @@ class ManageVehiclesTab extends StatefulWidget {
 
 class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
   final ApiService _api = ApiService();
-  List<VehicleModel> _vehicles = [];
+
+  // Dùng Map (JSON) để tránh lỗi cache của VehicleModel
+  List<Map<String, dynamic>> _vehicles = [];
+
   List<UserModel> _drivers = [];
   bool _isLoading = true;
-
 
   String? _errorMessage;
 
@@ -30,7 +32,6 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
   }
 
   Future<void> _loadData() async {
-
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -43,9 +44,8 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
       ]);
 
       setState(() {
-        _vehicles = (results[0].data as List)
-            .map((json) => VehicleModel.fromJson(json))
-            .toList();
+        _vehicles = List<Map<String, dynamic>>.from(results[0].data as List);
+
         _drivers = (results[1].data as List)
             .map((json) => UserModel.fromJson(json))
             .toList();
@@ -111,9 +111,9 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
                 await _api.post(
                   ApiConstants.vehicles,
                   data: {
-                    'bs_XE': bsXeController.text.toUpperCase(),
+                    'bS_XE': bsXeController.text.toUpperCase(),
                     'tenxe': tenXeController.text,
-                    'tt_XE': 'AVAILABLE',
+                    'tT_XE': 'Sẵn sàng',
                   },
                 );
 
@@ -136,16 +136,16 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
     );
   }
 
-  Future<void> _showEditDialog(VehicleModel vehicle) async {
-    final tenXeController = TextEditingController(text: vehicle.tenxe);
-    final ttXeController = TextEditingController(text: vehicle.ttXe);
+  Future<void> _showEditDialog(Map<String, dynamic> vehicle) async {
+    final tenXeController = TextEditingController(text: vehicle['tenxe']);
+    final ttXeController = TextEditingController(text: vehicle['tT_XE']);
 
     final currentContext = context;
 
     await showDialog<bool>(
       context: currentContext,
       builder: (context) => AlertDialog(
-        title: Text('Sửa xe ${vehicle.bsXe}'),
+        title: Text('Sửa xe ${vehicle['bS_XE']}'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -179,15 +179,15 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
 
               try {
                 await _api.put(
-                  ApiConstants.vehicleById(vehicle.bsXe),
+                  ApiConstants.vehicleById(vehicle['bS_XE']),
                   data: {
                     'tenXe': tenXeController.text,
-                    'tt_XE': ttXeController.text,
+                    'tT_XE': ttXeController.text,
                   },
                 );
 
                 navigator.pop(true);
-                _loadData(); // Tải lại dữ liệu
+                _loadData();
 
                 messenger.showSnackBar(
                   const SnackBar(content: Text('Cập nhật xe thành công')),
@@ -205,8 +205,8 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
     );
   }
 
-  Future<void> _assignDriver(VehicleModel vehicle) async {
-    int? selectedDriverId = vehicle.userId;
+  Future<void> _assignDriver(Map<String, dynamic> vehicle) async {
+    int? selectedDriverId = vehicle['userId'];
 
     final currentContext = context;
     final messenger = ScaffoldMessenger.of(context);
@@ -215,7 +215,7 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
       context: currentContext,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: Text('Gán tài xế cho ${vehicle.bsXe}'),
+          title: Text('Gán tài xế cho ${vehicle['bS_XE']}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -257,15 +257,37 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
 
     try {
       await _api.put(
-        ApiConstants.assignDriver(vehicle.bsXe),
-        data: {'userId': result},
+        ApiConstants.assignDriver(vehicle['bS_XE']),
+        data: {'UserId': result},
       );
 
       _loadData();
 
       messenger.showSnackBar(const SnackBar(content: Text('Gán tài xế thành công')));
+
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
+      String errorMessage = e.toString();
+      if (e is DioException) {
+        errorMessage = 'Lỗi Dio: ${e.message}\n';
+        if (e.response != null) {
+          errorMessage += 'Response Data: ${e.response?.data}';
+        }
+      }
+
+      if (!currentContext.mounted) return;
+      await showDialog(
+        context: currentContext,
+        builder: (context) => AlertDialog(
+          title: const Text('Gán thất bại'),
+          content: Text('Đã xảy ra lỗi:\n\n$errorMessage'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -305,23 +327,18 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
   }
 
   Widget _buildContent() {
-
     if (_isLoading) {
       return const LoadingWidget();
     }
-
-    // TRẠNG THÁI 2: BỊ LỖI
     if (_errorMessage != null) {
       return ErrorDisplayWidget(
         message: _errorMessage!,
         onRetry: _loadData,
       );
     }
-
     if (_vehicles.isEmpty) {
       return const Center(child: Text('Chưa có xe nào'));
     }
-
     return RefreshIndicator(
       onRefresh: _loadData,
       child: ListView.builder(
@@ -346,7 +363,6 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
         ],
       ),
-
       body: _buildContent(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,
@@ -356,7 +372,12 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
     );
   }
 
-  Widget _buildVehicleCard(VehicleModel vehicle) {
+  // ⭐️⭐️⭐️ ĐÃ SỬA THEO Ý BẠN ⭐️⭐️⭐️
+  Widget _buildVehicleCard(Map<String, dynamic> vehicle) {
+    String tenXe = vehicle['tenxe'] ?? '';
+    String bsXe = vehicle['bS_XE'] ?? '';
+    String? driverFullName = vehicle['driverFullName'];
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -371,22 +392,28 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
           ),
           child: const Icon(Icons.local_shipping, color: AppColors.success),
         ),
+        // ⭐️ SỬA 1: Title (in đậm) là Biển số xe
         title: Text(
-          vehicle.bsXe,
+          bsXe.isNotEmpty ? bsXe : '(Chưa có biển số)',
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (vehicle.tenxe != null) Text(vehicle.tenxe!),
+            // ⭐️ SỬA 2: Subtitle (chữ thường) là Tên xe
+            Text(
+              tenXe.isNotEmpty ? tenXe : 'Chưa đặt tên xe',
+              style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 4),
-            if (vehicle.driverFullName != null)
+            // Phần thông tin tài xế giữ nguyên
+            if (driverFullName != null)
               Row(
                 children: [
                   const Icon(Icons.person, size: 16, color: AppColors.success),
                   const SizedBox(width: 4),
                   Text(
-                    vehicle.driverFullName!,
+                    driverFullName,
                     style: const TextStyle(
                       color: AppColors.success,
                       fontWeight: FontWeight.w500,
@@ -441,7 +468,10 @@ class _ManageVehiclesTabState extends State<ManageVehiclesTab> {
             } else if (value == 'assign') {
               _assignDriver(vehicle);
             } else if (value == 'delete') {
-              _deleteVehicle(vehicle.bsXe);
+              String? bsXeToDelete = vehicle['bS_XE'];
+              if (bsXeToDelete != null && bsXeToDelete.isNotEmpty) {
+                _deleteVehicle(bsXeToDelete);
+              }
             }
           },
         ),
