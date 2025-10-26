@@ -63,6 +63,10 @@ dependencies:
   url_launcher: ^6.3.0
 
   flutter_nfc_kit: ^3.6.0
+  http: ^1.1.0
+  speech_to_text: ^7.3.0 
+  permission_handler: ^11.0.1
+  flutter_tts: ^4.0.2  
 dev_dependencies:
   flutter_test:
     sdk: flutter
