@@ -1,3 +1,5 @@
+// File: lib/screens/owner/dashboard_tab.dart
+
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../../core/constants/app_colors.dart';
@@ -5,6 +7,7 @@ import '../../core/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
 import '../../widgets/loading_widget.dart';
 import '../../widgets/error_widget.dart';
+import 'nfc_score_screen.dart'; // 🆕 THÊM MỚI: Import màn hình NFC
 
 class DashboardTab extends StatefulWidget {
   const DashboardTab({super.key});
@@ -55,7 +58,7 @@ class _DashboardTabState extends State<DashboardTab> {
         _isLoading = false;
       });
     } catch (e) {
-
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -63,9 +66,7 @@ class _DashboardTabState extends State<DashboardTab> {
     }
   }
 
-
   Widget _buildContent() {
-
     if (_isLoading) {
       return const LoadingWidget();
     }
@@ -85,19 +86,42 @@ class _DashboardTabState extends State<DashboardTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            _buildNfcButton(), // 🆕 THÊM: Nút Cộng điểm NFC
+            const SizedBox(height: 24),
             _buildStatsGrid(),
             const SizedBox(height: 24),
             Text(
               'Biểu đồ tổng quan',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+              style: Theme.of(
+                context,
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             _buildChart(),
             const SizedBox(height: 20),
           ],
         ),
+      ),
+    );
+  }
+
+  // 🆕 THÊM MỚI: Nút Cộng điểm NFC và chuyển hướng
+  Widget _buildNfcButton() {
+    return ElevatedButton.icon(
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const NfcScoreScreen()),
+        );
+      },
+      icon: const Icon(Icons.nfc, size: 28),
+      label: const Text('CỘNG ĐIỂM THƯỞNG BẰNG NFC'),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: AppColors.success,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(double.infinity, 50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
       ),
     );
   }
@@ -158,11 +182,11 @@ class _DashboardTabState extends State<DashboardTab> {
   }
 
   Widget _buildStatCard(
-      String title,
-      String value,
-      IconData icon,
-      Color color,
-      ) {
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(

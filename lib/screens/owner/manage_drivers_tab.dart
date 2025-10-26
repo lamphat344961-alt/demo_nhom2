@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart'; // <--- THÊM IMPORT
+
 import '../../core/constants/app_colors.dart';
 import '../../core/services/api_service.dart';
 import '../../core/constants/api_constants.dart';
-import '../../models/user_model.dart';
+import '../../models/user_model.dart'; // Đảm bảo UserModel có phoneNumber
 import '../../widgets/loading_widget.dart';
 import '../../widgets/error_widget.dart';
 
@@ -17,7 +19,6 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
   final ApiService _api = ApiService();
   List<UserModel> _drivers = [];
   bool _isLoading = true;
-
   String? _errorMessage;
 
   @override
@@ -27,22 +28,27 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
   }
 
   Future<void> _loadDrivers() async {
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    // Chỉ set loading=true nếu chưa có dữ liệu hoặc có lỗi
+    if (_drivers.isEmpty || _errorMessage != null) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
 
     try {
       final response = await _api.get(ApiConstants.drivers);
       final List data = response.data;
 
+      // Kiểm tra mounted trước khi setState
+      if (!mounted) return;
       setState(() {
         _drivers = data.map((json) => UserModel.fromJson(json)).toList();
         _isLoading = false;
+        _errorMessage = null; // Xóa lỗi cũ nếu thành công
       });
     } catch (e) {
-
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
         _errorMessage = e.toString();
@@ -50,8 +56,8 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
     }
   }
 
+  // (Hàm _showAddDialog giữ nguyên code gốc của bạn)
   Future<void> _showAddDialog() async {
-
     final usernameController = TextEditingController();
     final passwordController = TextEditingController();
     final fullNameController = TextEditingController();
@@ -123,15 +129,15 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
                   fullNameController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Vui lòng điền đầy đủ thông tin bắt buộc (*)'),
+                    content: Text(
+                      'Vui lòng điền đầy đủ thông tin bắt buộc (*)',
+                    ),
                   ),
                 );
                 return;
               }
-
-              final navigator = Navigator.of(context);
-              final messenger = ScaffoldMessenger.of(context);
-
+              // Sử dụng context an toàn hơn (tránh dùng biến cục bộ sau await)
+              final currentContext = context;
               try {
                 await _api.post(
                   ApiConstants.createDriver,
@@ -149,14 +155,20 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
                   },
                 );
 
-                navigator.pop();
-                _loadDrivers(); // Tải lại dữ liệu
-                messenger.showSnackBar(
+                if (!currentContext.mounted)
+                  return; // Kiểm tra trước khi dùng context
+                Navigator.pop(currentContext); // Đóng dialog
+                await _loadDrivers(); // Tải lại dữ liệu
+
+                if (!currentContext.mounted) return;
+                ScaffoldMessenger.of(currentContext).showSnackBar(
                   const SnackBar(content: Text('Thêm tài xế thành công')),
                 );
               } catch (e) {
-                messenger.showSnackBar(
-                    SnackBar(content: Text('Lỗi: ${e.toString()}')));
+                if (!currentContext.mounted) return;
+                ScaffoldMessenger.of(
+                  currentContext,
+                ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
               }
             },
             child: const Text('Thêm'),
@@ -166,19 +178,39 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
     );
   }
 
+  // ----- HÀM MỚI: GỌI ĐIỆN CHO DRIVER -----
+  Future<void> _callDriver(String? phoneNumber) async {
+    if (phoneNumber == null || phoneNumber.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tài xế này không có số điện thoại.')),
+      );
+      return;
+    }
+
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      // Dùng launchUrl trực tiếp, nó sẽ trả về false nếu không mở được
+      if (!await launchUrl(launchUri)) {
+        throw 'Không thể mở ứng dụng gọi điện thoại.';
+      }
+    } catch (e) {
+      // Kiểm tra mounted trước khi hiển thị SnackBar
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi: ${e.toString()}')));
+      }
+    }
+  }
+  // ------------------------------------
+
   Widget _buildContent() {
-    // TRẠNG THÁI 1: ĐANG TẢI
     if (_isLoading) {
       return const LoadingWidget();
     }
-
     if (_errorMessage != null) {
-      return ErrorDisplayWidget(
-        message: _errorMessage!,
-        onRetry: _loadDrivers,
-      );
+      return ErrorDisplayWidget(message: _errorMessage!, onRetry: _loadDrivers);
     }
-
     if (_drivers.isEmpty) {
       return const Center(child: Text('Chưa có tài xế nào'));
     }
@@ -190,6 +222,10 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
         itemCount: _drivers.length,
         itemBuilder: (context, index) {
           final driver = _drivers[index];
+          // Kiểm tra xem có số điện thoại hợp lệ không
+          final bool hasValidPhone =
+              driver.phoneNumber != null && driver.phoneNumber!.isNotEmpty;
+
           return Card(
             margin: const EdgeInsets.only(bottom: 12),
             elevation: 2,
@@ -197,8 +233,10 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
               borderRadius: BorderRadius.circular(12),
             ),
             child: ListTile(
-              contentPadding:
-              const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 16,
+              ),
               leading: CircleAvatar(
                 backgroundColor: AppColors.ownerPrimary.withAlpha(51),
                 child: Text(
@@ -213,22 +251,32 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
               ),
               title: Text(
                 driver.fullName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
+                style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 4),
                   Text('Username: ${driver.username}'),
-                  if (driver.phoneNumber != null &&
-                      driver.phoneNumber!.isNotEmpty)
-                    Text('SĐT: ${driver.phoneNumber!}'),
+                  // Chỉ hiển thị SĐT nếu có
+                  if (hasValidPhone) Text('SĐT: ${driver.phoneNumber!}'),
                   if (driver.cccd != null && driver.cccd!.isNotEmpty)
                     Text('CCCD: ${driver.cccd!}'),
                 ],
               ),
+              // ----- THÊM ICON GỌI ĐIỆN VÀO TRAILING -----
+              trailing: hasValidPhone
+                  ? IconButton(
+                      icon: const Icon(
+                        Icons.call_outlined,
+                        color: AppColors.success,
+                      ),
+                      tooltip: 'Gọi ${driver.fullName}', // Tooltip hữu ích
+                      // Gọi hàm _callDriver khi nhấn nút
+                      onPressed: () => _callDriver(driver.phoneNumber),
+                    )
+                  : null, // Không hiển thị nút nếu không có SĐT
+              // -------------------------------------------
             ),
           );
         },
@@ -247,7 +295,6 @@ class _ManageDriversTabState extends State<ManageDriversTab> {
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadDrivers),
         ],
       ),
-
       body: _buildContent(),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddDialog,

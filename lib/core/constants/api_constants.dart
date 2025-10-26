@@ -16,6 +16,10 @@ class ApiConstants {
   static const String vehicles = '/Xe';
   static String vehicleById(String id) => '/Xe/$id';
   static String assignDriver(String bsxe) => '/Xe/$bsxe/assign-driver';
+  static const String assignNfcCard =
+      '/User/assign-nfc'; // Giả định API gán thẻ (sẽ tạo sau)
+  static const String addDriverScore =
+      '/Owner/add-score'; // 🆕 THÊM MỚI: API cộng điểm
 
   // Owner - Drivers
   static const String drivers = '/User/drivers';
