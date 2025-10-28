@@ -207,7 +207,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
     );
   }
 
-  // (Bạn có thể thêm hàm _deleteProduct(mahh) tương tự)
+  //
 
   @override
   Widget build(BuildContext context) {
@@ -273,7 +273,6 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
                 color: AppColors.success,
               ),
             ),
-            // (Bạn có thể thêm PopupMenuButton ở đây để Xóa)
           ),
         );
       },

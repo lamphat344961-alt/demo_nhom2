@@ -48,7 +48,7 @@ class ApiConstants {
   static const String myDeliveries = '/Driver/my-deliveries';
   static const String completeDelivery = '/CtDiemGiao/complete';
   // Thêm vào class ApiConstants:
-  static String driverComplete(String maDon) => '/api/Driver/complete/$maDon';
+  static String driverComplete(String maDon) => '/Driver/complete/$maDon';
 
   // Timeout
   static const Duration timeout = Duration(seconds: 30);

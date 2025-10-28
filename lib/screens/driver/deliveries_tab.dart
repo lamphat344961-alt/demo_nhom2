@@ -1,3 +1,5 @@
+// File: lib/screens/driver/deliveries_tab.dart
+
 import 'package:demo_nhom2/models/order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -32,6 +34,7 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
     setState(() => _isLoading = true);
     try {
       final response = await _api.get(ApiConstants.myDeliveries);
+      // Backend trả về String ("Bạn chưa được gán xe...") nếu không có đơn
       if (response.data is String) {
         setState(() {
           _deliveries = [];
@@ -41,6 +44,7 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
       }
       final List data = response.data;
       setState(() {
+        // 🔄 SỬA LỌC: Bỏ logic lọc ở đây vì Backend đã lọc chỉ còn 'CHO_GIAO'
         _deliveries = data.map((json) => DeliveryModel.fromJson(json)).toList();
         _isLoading = false;
       });
@@ -54,6 +58,8 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
     }
   }
 
+  // ... (Hàm _launchGoogleMaps giữ nguyên) ...
+
   Future<void> _launchGoogleMaps(DeliveryModel delivery) async {
     final String? address = delivery.diaChiGiao;
     if (address == null || address.isEmpty) {
@@ -63,10 +69,12 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
       return;
     }
     final query = Uri.encodeComponent(address);
+    // 🔄 SỬA LỖI: Cấu trúc URL sai, cần sửa lại thành chuẩn Google Maps
     final Uri googleMapsUrl = Uri.parse(
       'https://www.google.com/maps/search/?api=1&query=$query',
     );
     try {
+      // 🔄 SỬA LỖI: Kiểm tra canLaunchUrl trên URL đã sửa
       if (await canLaunchUrl(googleMapsUrl)) {
         await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
       } else {
@@ -106,9 +114,16 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
     if (confirm != true) return;
 
     try {
-      // Dùng endpoint chính xác /api/Driver/complete/{maDon}
+      // Dùng endpoint chính xác /Driver/complete/{maDon}
       await _api.post(ApiConstants.driverComplete(delivery.maDonHang));
-      _loadDeliveries();
+
+      // 🔄 LỌC: Thay vì tải lại toàn bộ, ta chỉ cần xóa đơn hàng vừa hoàn thành
+      if (mounted) {
+        setState(() {
+          _deliveries.removeWhere((d) => d.maDonHang == delivery.maDonHang);
+        });
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -117,6 +132,8 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
           ),
         );
       }
+      // 🔄 Cần tải lại đơn hàng để cập nhật trạng thái nếu muốn hiển thị tiếp
+      // Nhưng vì Backend chỉ lọc CHO_GIAO, việc xóa là tối ưu nhất.
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -125,6 +142,8 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
       }
     }
   }
+
+  // ... (Hàm _toggleSort giữ nguyên) ...
 
   void _toggleSort() {
     final routeProvider = context.read<RouteProvider>();
@@ -148,6 +167,8 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
 
   @override
   Widget build(BuildContext context) {
+    // ... (logic sắp xếp giữ nguyên) ...
+
     List<DeliveryModel> displayedDeliveries = List.from(_deliveries);
 
     // Lắng nghe (watch) để UI tự cập nhật nếu tuyến đường thay đổi
@@ -239,7 +260,8 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
   }
 
   Widget _buildDeliveryCard(DeliveryModel delivery) {
-    final isCompleted = delivery.trangThai.toUpperCase() == 'HOANTHANH';
+    // Hiện tại: chỉ xử lý đơn CHO_GIAO
+    const isCompleted = false;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -255,14 +277,13 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: isCompleted
-                        ? AppColors.success.withOpacity(0.1)
-                        : AppColors.warning.withOpacity(0.1),
+                    // 🔄 SỬA MÀU: Luôn dùng màu CHO_GIAO
+                    color: AppColors.warning.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(
-                    isCompleted ? Icons.check_circle : Icons.location_on,
-                    color: isCompleted ? AppColors.success : AppColors.warning,
+                  child: const Icon(
+                    Icons.location_on,
+                    color: AppColors.warning,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -293,17 +314,13 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: isCompleted
-                        ? AppColors.success.withOpacity(0.1)
-                        : AppColors.warning.withOpacity(0.1),
+                    color: AppColors.warning.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Text(
-                    isCompleted ? 'Hoàn thành' : 'Chờ giao',
+                  child: const Text(
+                    'Chờ giao',
                     style: TextStyle(
-                      color: isCompleted
-                          ? AppColors.success
-                          : AppColors.warning,
+                      color: AppColors.warning,
                       fontWeight: FontWeight.bold,
                       fontSize: 12,
                     ),
@@ -335,45 +352,43 @@ class _DeliveriesTabState extends State<DeliveriesTab> {
               ),
             ],
 
-            // ----- KHU VỰC 2 NÚT BẤM -----
-            if (!isCompleted) ...[
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _launchGoogleMaps(delivery),
-                      icon: const Icon(Icons.navigation_outlined),
-                      label: const Text('Bắt đầu'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.driverPrimary,
-                        side: const BorderSide(color: AppColors.driverPrimary),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+            // ----- KHU VỰC 2 NÚT BẤM (luôn hiển thị vì isCompleted=false) -----
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _launchGoogleMaps(delivery),
+                    icon: const Icon(Icons.navigation_outlined),
+                    label: const Text('Bắt đầu'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.driverPrimary,
+                      side: const BorderSide(color: AppColors.driverPrimary),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _completeDelivery(delivery),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _completeDelivery(delivery),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.success,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      icon: const Icon(Icons.check_circle_outline),
-                      label: const Text('Hoàn thành'),
                     ),
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: const Text('Hoàn thành'),
                   ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
         ),
       ),

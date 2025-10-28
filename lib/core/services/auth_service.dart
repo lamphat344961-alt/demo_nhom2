@@ -25,7 +25,7 @@ class AuthService {
 
       final data = response.data;
 
-      // Backend của bạn trả về: { token, fullName, role }
+      // Backend  trả về: { token, fullName, role }
       final token = data['token'];
       final role = data['role'];
       final fullName = data['fullName'];
