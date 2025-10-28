@@ -63,6 +63,8 @@ dependencies:
   url_launcher: ^6.3.0
 
   flutter_nfc_kit: ^3.6.0
+
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
