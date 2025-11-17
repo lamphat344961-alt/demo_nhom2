@@ -1,2 +1,1 @@
 Xây dựng hệ thống quản lý giao hàng và tối ưu lộ trình vận chuyển cho doanh nghiệp nhỏ là một đề tài mang ý nghĩa khoa học và thực tiễn quan trọng. Hệ thống hướng đến việc cung cấp một nền tảng công nghệ hiện đại, giúp doanh nghiệp quản lý phương tiện, tài xế, đơn hàng và lộ trình giao hàng một cách hiệu quả, tiết kiệm thời gian và chi phí vận hành.
-Cách thức tối ưu : lấy vị trí -> mô phỏng ma trận thời gian bằng đường chim bay -> tối ưu -> gọi API lấy polyline 'vitri' đến 'vitri' + 1. MỤc tiêu tránh việc gọi API n * n, chỉ gọi API n lần để lấy polyline 
