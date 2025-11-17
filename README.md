@@ -1,16 +1,1 @@
-# demo_nhom2
-
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Xây dựng hệ thống quản lý giao hàng và tối ưu lộ trình vận chuyển cho doanh nghiệp nhỏ là một đề tài mang ý nghĩa khoa học và thực tiễn quan trọng. Hệ thống hướng đến việc cung cấp một nền tảng công nghệ hiện đại, giúp doanh nghiệp quản lý phương tiện, tài xế, đơn hàng và lộ trình giao hàng một cách hiệu quả, tiết kiệm thời gian và chi phí vận hành.
